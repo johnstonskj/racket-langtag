@@ -1,6 +1,7 @@
 # Racket Package langtag
 
-BCP-47 compliant language tag
+This package provides predicates that determines whether a given string is a valid *Language Tag* as defined
+by RFC5646 and used across HTTP, HTML, XML, RDF, and much more.
 
 [![raco pkg install langtag](https://img.shields.io/badge/raco%20pkg%20install-langtag-blue.svg)](http://pkgs.racket-lang.org/package/langtag)
 [![Documentation](https://img.shields.io/badge/raco%20docs-langtag-blue.svg)](http://docs.racket-lang.org/langtag/index.html)
@@ -9,6 +10,8 @@ BCP-47 compliant language tag
 [![GitHub stars](https://img.shields.io/github/stars/johnstonskj/racket-langtag.svg)](https://github.com/johnstonskj/racket-langtag/stargazers)
 
 ## Example
+
+TBD
 
 ```racket
 (require langtag)

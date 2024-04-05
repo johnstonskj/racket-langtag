@@ -12,7 +12,7 @@
 
 @;{============================================================================}
 
-@title[#:version  "1.0"]{BCP-47 compliant language tag}
+@title[#:version  "1.0"]{BCP-47 compliant language tag predicates}
 @author[(author+email "Simon Johnston" "johnstonskj@gmail.com")]
 @defmodule[langtag]
 
