@@ -7,26 +7,38 @@
          rx)
 
 (provide language-tag-match
-         language-tag?)
+         language-tag?
+         normal-use?
+         private-use?
+         grandfathered?
+         language-part?
+         language-script-part?
+         language-region-part?
+         language-variant-part?
+         language-extension-part?
+         language-private-use-part?)
 
 (define group-sep-char "-")
 
 (define (apply-prefix prefix lst)
   (map (λ (name) (string-append prefix name)) lst))
 
-(define bcp47-grandfathered-group-1
+(define bcp47-grandfathered-irregular
   (rx/or-group "en-GB-oed"
                "i-ami" "i-bnn" "i-default" "i-enochian" "i-hak" "i-klingon"
                "i-lux" "i-mingo" "i-navajo" "i-pwn" "i-tao" "i-tay" "i-tsu"
                "sgn-BE-FR" "sgn-BE-NL" "sgn-CH-DE"))
 
-(define bcp47-grandfathered-group-2
+(define bcp47-grandfathered-regular
   (rx/or-group "art-lojban"
                "cel-gaulish"
                "no-bok" "no-nyn"
                "zh-guoyu" "zh-hakka" "zh-min" "zh-min-nan" "zh-xiang"))
 
-(define bcp47-language
+(define bcp47-tl-grandfathered
+  (rx/or-group bcp47-grandfathered-irregular bcp47-grandfathered-regular))
+
+(define bcp47-language-part
   (rx/or-group
    (rx/and-group (rx/repeat rx/match-alpha #:lower 2 #:upper 3)
                  (rx/and-group group-sep-char
@@ -40,56 +52,70 @@
    (rx/repeat rx/match-alpha #:lower 4 #:upper 4)
    (rx/repeat rx/match-alpha #:lower 5 #:upper 8)))
 
+(define bcp47-script-part
+  (rx/group (rx/repeat rx/match-alpha #:lower 4 #:upper 4)))
+
 (define bcp47-script
   (rx/and-group group-sep-char
-                (rx/group (rx/repeat rx/match-alpha
-                                     #:lower 4 #:upper 4))
+                bcp47-script-part
                 #:repeat 'optional))
+
+(define bcp47-region-part
+  (rx/or-group (rx/repeat rx/match-alpha #:lower 2 #:upper 2)
+               (rx/repeat rx/match-digit #:lower 3 #:upper 3)))
 
 (define bcp47-region
   (rx/and-group group-sep-char
-                (rx/or-group (rx/repeat rx/match-alpha
-                                        #:lower 2 #:upper 2)
-                             (rx/repeat rx/match-alnum
-                                        #:lower 3 #:upper 3))
+                bcp47-region-part
                 #:repeat 'optional))
 
-;; Hard to capture as it's a repeating pattern.
+(define bcp47-variant-part
+  (rx/or-group (rx/repeat rx/match-alnum #:lower 5 #:upper 8)
+               (rx/and rx/match-digit
+                       (rx/repeat rx/match-alnum #:lower 3 #:upper 3))))
+
 (define bcp47-variant
   (rx/group
    (rx/and-group group-sep-char
-                 (rx/or-group (rx/repeat rx/match-alnum
-                                         #:lower 5 #:upper 8)
-                              (rx/and rx/match-digit
-                                      (rx/repeat rx/match-alnum
-                                                 #:lower 3 #:upper 3)))
+                 bcp47-variant-part
                  #:repeat 'zero-or-more)))
 
-;; Hard to capture as it's a repeating pattern.
+(define bcp47-extension-part
+  (rx/and-group (rx/match rx/range-digit
+                          (rx/range #\A #\W)
+                          (rx/range #\Y #\Z)
+                          (rx/range #\a #\w)
+                          (rx/range #\y #\z))
+                (rx/and-group "-"
+                              (rx/repeat rx/match-alnum
+                                         #:lower 2 #:upper 8)
+                              #:repeat 'one-or-more)))
+
 (define bcp47-extension
   (rx/group
    (rx/and-group group-sep-char
-                 (rx/and-group (rx/match rx/range-digit
-                                         (rx/range #\A #\W)
-                                         (rx/range #\Y #\Z)
-                                         (rx/range #\a #\w)
-                                         (rx/range #\y #\z))
-                               (rx/and-group "-"
-                                             (rx/repeat rx/match-alnum
-                                                        #:lower 2 #:upper 8)
-                                             #:repeat 'one-or-more))
+                 bcp47-extension-part
                  #:repeat 'zero-or-more)))
 
-(define bcp47-private-use
-  (rx/and-group group-sep-char
-                (rx/and-group "x"
-                              (rx/and-group group-sep-char
-                                            (rx/repeat rx/match-alnum
-                                                       #:lower 1 #:upper 8)
-                                            #:repeat 'one-or-more))
-                #:repeat 'optional))
+(define bcp47-private-use-part
+  (rx/and-group "x"
+                (rx/and-group group-sep-char
+                              (rx/repeat rx/match-alnum
+                                         #:lower 1 #:upper 8)
+                              #:repeat 'one-or-more)))
 
-(define bcp47-private-use-1
+(define bcp47-private-use
+  (rx/and-group group-sep-char bcp47-private-use-part #:repeat 'optional))
+
+(define bcp47-tl-language
+  (rx/and-group bcp47-language-part
+                bcp47-script
+                bcp47-region
+                bcp47-variant
+                bcp47-extension
+                bcp47-private-use))
+
+(define bcp47-tl-private-use
   (rx/and-group "x"
                 (rx/and-group group-sep-char
                               (rx/repeat rx/match-alnum
@@ -99,16 +125,74 @@
 (define bcp47-pattern
   (pregexp
    (rx/string-exactly
-    (rx/or-group                                ;; group 2
-     (rx/or-group bcp47-grandfathered-group-1   ;; group 3
-                  bcp47-grandfathered-group-2)  ;; group 4
-     (rx/and-group bcp47-language               ;; group 5 -> 6,9
-                   bcp47-script                 ;; group 12
-                   bcp47-region                 ;; group 14
-                   bcp47-variant                ;; group 15
-                   bcp47-extension              ;; group 18
-                   bcp47-private-use)           ;; group 23
-     bcp47-private-use-1))))                    ;; group 25
+    (rx/or-group
+     bcp47-tl-grandfathered
+     bcp47-tl-language
+     bcp47-tl-private-use))))
+
+;; -------------------------------------------------------------------------------------------------
+
+(define/contract (normal-use? val)
+  (-> (or/c symbol? string?) boolean?)
+  (if (symbol? val)
+      (normal-use? (symbol->string val))
+      (not (false? (regexp-match (pregexp (rx/string-exactly bcp47-tl-language)) val)))))
+
+(define/contract (private-use? val)
+  (-> (or/c symbol? string?) boolean?)
+  (if (symbol? val)
+      (private-use? (symbol->string val))
+      (not (false? (regexp-match (pregexp (rx/string-exactly bcp47-tl-private-use)) val)))))
+
+(define/contract (grandfathered? val)
+  (-> (or/c symbol? string?) boolean?)
+  (if (symbol? val)
+      (grandfathered? (symbol->string val))
+      (not (false? (regexp-match (pregexp (rx/string-exactly bcp47-tl-grandfathered)) val)))))
+
+(define/contract (language-part? val)
+  (-> (or/c symbol? string?) boolean?)
+  (if (symbol? val)
+      (language-part? (symbol->string val))
+      (not (false? (regexp-match (pregexp (rx/string-exactly bcp47-language-part)) val)))))
+
+(define/contract (language-script-part? val)
+  (-> (or/c symbol? string?) boolean?)
+  (if (symbol? val)
+      (language-script-part? (symbol->string val))
+      (not (false? (regexp-match (pregexp (rx/string-exactly bcp47-script-part)) val)))))
+
+(define/contract (language-region-part? val)
+  (-> (or/c symbol? string?) boolean?)
+  (if (symbol? val)
+      (language-region-part? (symbol->string val))
+      (not (false? (regexp-match (pregexp (rx/string-exactly bcp47-region-part)) val)))))
+
+(define/contract (language-variant-part? val)
+  (-> (or/c symbol? string?) boolean?)
+  (if (symbol? val)
+      (language-variant-part? (symbol->string val))
+      (not (false? (regexp-match (pregexp (rx/string-exactly bcp47-variant-part)) val)))))
+
+(define/contract (language-extension-part? val)
+  (-> (or/c symbol? string?) boolean?)
+  (if (symbol? val)
+      (language-extension-part? (symbol->string val))
+      (not (false? (regexp-match (pregexp (rx/string-exactly bcp47-extension-part)) val)))))
+
+(define/contract (language-private-use-part? val)
+  (-> (or/c symbol? string?) boolean?)
+  (if (symbol? val)
+      (language-private-use-part? (symbol->string val))
+      (not (false? (regexp-match (pregexp (rx/string-exactly bcp47-private-use-part)) val)))))
+
+;; -------------------------------------------------------------------------------------------------
+
+(define/contract (language-tag? val)
+  (-> (or/c symbol? string?) boolean?)
+  (if (symbol? val)
+      (language-tag? (symbol->string val))
+      (not (false? (regexp-match bcp47-pattern val)))))
 
 (define (language-property matches group name (skip 0))
   (let ((value (vector-ref matches group)))
@@ -131,18 +215,12 @@
         (let ((matches (list->vector match-list)))
           ;; debug: (displayln (map cons (range (length match-list)) match-list))
           (cond
-            ((vector-ref matches 3) (list 'grandfathered-1 (vector-ref matches 3)))
-            ((vector-ref matches 4) (list 'grandfathered-2 (vector-ref matches 4)))
+            ((vector-ref matches 3) (list 'grandfathered-i (vector-ref matches 3)))
+            ((vector-ref matches 4) (list 'grandfathered-r (vector-ref matches 4)))
             ((vector-ref matches 5) (list 'lang (vector-ref matches 5) (language-properties matches)))
             ((vector-ref matches 25) (list 'private-use (vector-ref matches 25)))
             (else '(error))))
         #f)))
-
-(define/contract (language-tag? val)
-  (-> (or/c symbol? string?) boolean?)
-  (if (symbol? val)
-      (language-tag? (symbol->string val))
-      (not (false? (regexp-match bcp47-pattern val)))))
 
 ;; -------------------------------------------------------------------------------------------------
 ;; In-Module Tests
@@ -165,14 +243,14 @@
      "Module langtag > function language-tag-match"
 
      (test-case
-         "grandfathered group 1"
+         "grandfathered - irregular"
        (check-equal? (language-tag-match "i-klingon")
-                     '(grandfathered-1 "i-klingon")))
+                     '(grandfathered-i "i-klingon")))
 
      (test-case
-         "grandfathered group 2"
+         "grandfathered - regular"
        (check-equal? (language-tag-match "zh-min")
-                     '(grandfathered-2 "zh-min")))
+                     '(grandfathered-r "zh-min")))
 
      (test-case
          "language, 2-char"
@@ -254,9 +332,9 @@
 
   (define language-tag-predicate-test-suite
     (test-suite
-     "Module langtag > function language-tag?"
+     "Module langtag > predicates"
 
-     (for-each (λ (v) (test-case (format "value: ~s" v) (check-true (language-tag? v))))
+     (for-each (λ (v) (test-case (format "function language-tag? > ~s" v) (check-true (language-tag? v))))
                '("en-GB-oed"
                  "i-ami" "i-bnn" "i-default" "i-enochian" "i-hak" "i-klingon"
                  "i-lux" "i-mingo" "i-navajo" "i-pwn" "i-tao" "i-tay" "i-tsu"
@@ -271,7 +349,48 @@
                  "es-419"
                  "sl-nedis" "de-CH-1996" "en-US-boont"
                  "de-a-value" "en-a-bbb-x-a-ccc" "en-a-bbb-b-ccc"
-                 "x-abcde"))))
+                 ;; -------------------------------------------------------------------
+                 "x-abcde"))
+
+     (for-each (λ (v) (test-case (format "function grandfathered? > ~s" v) (check-true (grandfathered? v))))
+               '("en-GB-oed"
+                 "i-ami" "i-bnn" "i-default" "i-enochian" "i-hak" "i-klingon"
+                 "i-lux" "i-mingo" "i-navajo" "i-pwn" "i-tao" "i-tay" "i-tsu"
+                 "sgn-BE-FR" "sgn-BE-NL" "sgn-CH-DE"
+                 ;; -------------------------------------------------------------------
+                 "art-lojban"
+                 "cel-gaulish"
+                 "no-bok" "no-nyn"
+                 "zh-guoyu" "zh-hakka" "zh-min" "zh-min-nan" "zh-xiang"))
+
+     (for-each (λ (v) (test-case (format "function private-use? > ~s" v)
+                        (check-true (private-use? v))))
+               '("x-private"))
+
+     (for-each (λ (v) (test-case (format "function language? > ~s" v)
+                        (check-true (normal-use? v))))
+               '("en" "en-US" "en-Latn" "en-Latn-US" "sr-Latn" "sr-Latn-RS" "zh-cmn"
+                 "es-419"
+                 "sl-nedis" "de-CH-1996" "en-US-boont"
+                 "de-a-value" "en-a-bbb-x-a-ccc" "en-a-bbb-b-ccc"))
+
+     (for-each (λ (v) (test-case (format "function language-part? > ~s" v)
+                        (check-true (language-part? v))))
+               '("en" "sr" "zh-cmn"))
+
+     (for-each (λ (v) (test-case (format "function language-script-part? > ~s" v)
+                        (check-true (language-script-part? v))))
+               '("Latn"))
+
+     (for-each (λ (v) (test-case (format "function language-region-part? > ~s" v)
+                        (check-true (language-region-part? v))))
+               '("US" "RS" "CH" "419"))
+
+     (for-each (λ (v) (test-case (format "function language-variant-part? > ~s" v)
+                        (check-true (language-variant-part? v))))
+               '("nedis" "boont" "1996"))
+
+     ))
 
   ;; -----------------------------------------------------------------------------------------------
   ;; Test Runner

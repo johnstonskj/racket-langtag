@@ -12,15 +12,27 @@
 
 @;{============================================================================}
 
-@title[#:version  "0.1.0"]{BCP-47 compliant language tag}
+@title[#:version  "1.0"]{BCP-47 compliant language tag}
 @author[(author+email "Simon Johnston" "johnstonskj@gmail.com")]
 @defmodule[langtag]
+
+This module provides a single predicate that determines whether a given string is a valid @italic{Language Tag} as defined
+by RFC5646 and used across HTTP, HTML, XML, RDF, and much more.
+
+@bold{References}
+
+@itemlist[
+  @item{BCP-47, RFC5646 @hyperlink["https://www.rfc-editor.org/info/rfc5646"]{Tags for Identifying Languages}}
+  @item{IANA Registry of @hyperlink["https://www.iana.org/assignments/language-tags/language-tags.xhtml#language-tags-1"]{Language Tags (Assigned)}}
+  @item{IANA Registry of @hyperlink["https://www.iana.org/assignments/language-subtag-registry/language-subtag-registry"]{Language Subtags}}
+  @item{IANA Registry of @hyperlink["https://www.iana.org/assignments/language-tag-extensions-registry/language-tag-extensions-registry"]{Language Tag Extensions (UCD)}}
+]
 
 @defproc[#:kind "predicate"
          (language-tag?
           [val (or/c symbol? string?)])
          boolean?]{
-TBD
+Returns @racket[#t] if the string @italic{val} is a valid BCP-47 language tag.
 
 @examples[#:eval example-eval
 (require langtag)
@@ -33,6 +45,43 @@ TBD
 (language-tag? "x-private")
 ]
 }
+
+@;{============================================================================}
+@section[]{Components}
+
+@deftogether[(
+  @defproc[#:kind "predicate" (normal-use? [val (or/c symbol? string?)]) boolean?]
+  @defproc[#:kind "predicate" (private-use? [val (or/c symbol? string?)]) boolean?]
+  @defproc[#:kind "predicate" (grandfathered? [val (or/c symbol? string?)]) boolean?]
+)]{
+Returns @racket[#t] if the string @italic{val} corresponds to one of the three top-level productions
+for the rule @tt{Language-Tag}.
+
+@examples[#:eval example-eval
+(require langtag)
+
+(for-each (lambda (val) (displayln (format "~s ~s ~s"
+                                           (normal-use? val)
+                                           (private-use? val)
+                                           (grandfathered? val))))
+          '("en-US" "x-private" "i-klingon"))
+]
+}
+
+@deftogether[(
+  @defproc[#:kind "predicate" (language-part? [val (or/c symbol? string?)]) boolean?]
+  @defproc[#:kind "predicate" (language-script-part? [val (or/c symbol? string?)]) boolean?]
+  @defproc[#:kind "predicate" (language-region-part? [val (or/c symbol? string?)]) boolean?]
+  @defproc[#:kind "predicate" (language-variant-part? [val (or/c symbol? string?)]) boolean?]
+  @defproc[#:kind "predicate" (language-extension-part? [val (or/c symbol? string?)]) boolean?]
+  @defproc[#:kind "predicate" (language-private-use-part? [val (or/c symbol? string?)]) boolean?]
+)]{
+Returns @racket[#t] if the string @italic{val} corresponds to one of the components of a normal-use
+language tag.
+}
+
+@;{============================================================================}
+@section[]{Matching}
 
 @defproc[(language-tag-match
           [val (or/c symbol? string?)])
