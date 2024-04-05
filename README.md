@@ -26,4 +26,10 @@ TBD
 
 ## Changes
 
-TBD
+**Version 1.0**
+
+Initial release:
+
+* Feature: a set of usable predicates for all aspects of the language tag.
+* Feature: partial matcher that will break down most language tags.
+  * Work to do to split variant and extensions into lists.
